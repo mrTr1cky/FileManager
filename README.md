@@ -50,7 +50,7 @@
 
 2. **Setup**:
    ```bash
-   git clone https://github.com/yourusername/FileManager.git
+   git clone https://github.com/mrTr1cky/FileManager.git
    cd FileManager
    ```
 
