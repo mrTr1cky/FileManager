@@ -50,8 +50,8 @@
 
 2. **Setup**:
    ```bash
-   git clone https://github.com/yourusername/advance-file-manager.git
-   cd advance-file-manager
+   git clone https://github.com/yourusername/FileManager.git
+   cd FileManager
    ```
 
 3. **Configuration**:
@@ -88,7 +88,7 @@
    - Clear history with the "Clear History" button.
 
 4. **Navigation**:
-   - Click segments in the directory path (e.g., `/homepages/22/d448530657/htdocs`) to jump to parent directories.
+   - Click segments in the directory path (e.g., `/home/username/public_html/`) to jump to parent directories.
 
 5. **Logout**:
    - Click the "Logout" link to end the session.
