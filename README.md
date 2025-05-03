@@ -5,6 +5,8 @@
 🦁 **MAD TIGER**  
 📩 Telegram: [@DevidLuice](https://t.me/DevidLuice)
 
+![alt text](photo.png)
+
 ## Features
 
 - **File Management**:
